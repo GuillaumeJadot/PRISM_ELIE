@@ -41,6 +41,3 @@ Access the web application by navigating to http://127.0.0.1:5000/ in your web b
 6.Usage
 The web interface allows you to input coordinates or an address to analyze. The results, along with an interactive map, will be displayed on the page.
 
-## Authors ##
-Guillaume Jadot - Initial work
-
