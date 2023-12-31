@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Analyzer</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 50px;
+        }
+
+        .custom-radio {
+            margin-bottom: 20px;
+        }
+
+        .results-section {
+            margin-top: 40px;
+        }
+
+        .loading-message {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .result-card {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        #legend {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #999;
+            font-size: 14px;
+            line-height: 1.5;
+            z-index: 1000; /* to ensure it's on top of the map */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="mb-4">PRISM</h1>
+        <h5><b>Pollution and risks identification system for medecine</b></h5>
+
+        <form action="/" method="post" id="analysisForm">
+            <!-- Choice between adress and coord -->
+            <div class="custom-control custom-radio">
+                <input type="radio" id="address_option" name="location_type" value="address" class="custom-control-input" checked>
+                <label class="custom-control-label" for="address_option">Enter Address</label>
+            </div>
+            <div class="custom-control custom-radio">
+                <input type="radio" id="coordinates" name="location_type" value="coordinates" class="custom-control-input">
+                <label class="custom-control-label" for="coordinates">Enter Coordinates</label>
+            </div>
+
+            <!-- First, Address input -->
+            <div id="address_field" class="mt-3">
+                <div class="form-group">
+                    <label for="address">Address:</label>
+                    <input type="text" class="form-control" id="address" name="address">
+                </div>
+            </div>
+
+            <!-- Second, Coordinates input -->
+
+            <div id="coordinates_fields" style="display: none;" class="mt-3">
+                <div class="form-group">
+                    <label for="latitude">Latitude:</label>
+                    <input type="text" class="form-control" name="latitude" placeholder="Enter Latitude">
+                </div>
+                <div class="form-group">
+                    <label for="longitude">Longitude:</label>
+                    <input type="text" class="form-control" name="longitude" placeholder="Enter Longitude">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Analyze</button>
+        </form>
+
+        <div class="loading-message alert alert-info mt-3">
+            <p>Analysis in progress... Please wait.</p>
+        </div>
+           
+
+        {% set legend_displayed = False %}
+
+        
+       
+<!-- Dynamic analysis results -->
+{% for result in analysis_results %}
+<div class="result-card">
+    <div class="button-group" style="display: flex; align-items: center;">
+        <button class="{{ result['type'] }}-indicator" style="background-color: {{ result['color'] }};" onclick="toggleDetails('{{ result['type'] }}')">
+            {{ result['type'].capitalize() }} Risk Indicator
+        </button>
+        {% if result['type'] in ['pollution_summary', 'seveso', 'radon', 'floods', 'inorganic_pollutants', 'pollution_sonore_route'] %}
+            <button class="btn btn-info" style="margin-left: 10px;" onclick="toggleLegend('{{ result['type'] }}')">Info</button>
+        {% endif %}
+    </div>
+    <div class="{{ result['type'] }}-details" style="display: none; margin-top: 10px;">
+        <!-- Include the specific details for all layers -->
+        {% if result['type'] == 'pollution_summary' %}
+            {% for detail in result['details'] %}
+                <p style="color: {{ 'red' if detail['limit_exceeded'] else 'green' }}">
+                    {{ detail['pollutant'] }}: {{ detail['value'] }} µg/m³
+                </p>
+            {% endfor %}
+            <!-- details for the rest -->
+        {% else %}
+            <p>{{ result['message'] }}</p>
+        {% endif %}
+    </div>
+        <!-- Information Button Content -->
+        {% if result['type'] == 'pollution_summary' %}
+            <div class="pollution_summary-legend" style="display: none;">
+                <h5>Valeurs limites proposées par l'OMS pour les polluants atmosphériques basées sur des valeurs moyennes annuelles :</h5>
+                <ul>
+                    <li>NO2: 25 µg/m³</li>
+                    <li>PM10: 15 µg/m³</li>
+                    <li>PM2.5: 5 µg/m³</li>
+                </ul>
+                <p>La pollution de l'air est principalement associée à des maladies cardio-respiratoires, cérébro-vasculaires et à certains types de cancers.</p>
+                <p>Source : Febvrel D., Squinazi F., Bex and al. (2019). <em>Facteurs contribuant à un habitat favorable à la santé. État des lieux des connaissances et recommandations pour asseoir des politiques publiques pour un habitat sain</em>. Dans HAL (Le Centre pour la Communication Scientifique Directe). <a href="https://hal.ehesp.fr/hal-02190365">Link to source</a></p>
+            </div>
+        {% endif %}
+        {% if result['type'] == 'seveso' %}
+            <div class="seveso-legend" style="display: none;">
+                <h5>Sites SEVESO :</h5>
+                <p>Les sites Seveso sont des zones où des incidents éventuels peuvent survenir, engendrant des conséquences possibles pour le personnel, les populations environnantes, les biens ou l'environnement. Les territoires sont exposés à divers risques naturels tels que la submersion marine, les ruissellements, les pluies diluviennes, l'érosion du littoral, les mouvements de terrain, etc.</p>
+                <p>Source : Febvrel D., Squinazi F., Bex and al. (2019). <em>Facteurs contribuant à un habitat favorable à la santé. État des lieux des connaissances et recommandations pour asseoir des politiques publiques pour un habitat sain</em>. Dans HAL (Le Centre pour la Communication Scientifique Directe). <a href="https://hal.ehesp.fr/hal-02190365">Link to source</a></p>
+            </div>
+        {% endif %}
+        {% if result['type'] == 'pollution_sonore_route' %}
+        <div class="pollution_sonore_route-legend" style="display: none;">
+            <h5>Risques liées à la pollution sonore :</h5>
+            <p>Le bruit peut perturber les activités quotidiennes et avoir des répercussions sur la santé, se manifestant par des problèmes auditifs tels que les acouphènes, une qualité de sommeil altérée, des événements cardiovasculaires, des déficits cognitifs et d'autres conséquences métaboliques touchant, par exemple, le système immunitaire, endocrinien, ou la santé mentale. </p>
+            <p>Source : Febvrel D., Squinazi F., Bex and al. (2019). <em>Facteurs contribuant à un habitat favorable à la santé. État des lieux des connaissances et recommandations pour asseoir des politiques publiques pour un habitat sain</em>. Dans HAL (Le Centre pour la Communication Scientifique Directe). <a href="https://hal.ehesp.fr/hal-02190365">Link to source</a></p>
+        </div>
+    {% endif %}
+        {% if result['type'] == 'radon' %}
+            <div class="radon-legend" style="display: none;">
+                <h5>Risques radon:</h5>
+                <p>Le radon, considéré comme un agent carcinogène, constitue la deuxième cause de cancer du poumon après le tabagisme. En fonction des données scientifiques les plus récentes, l'OMS propose un niveau de référence de 100 Bq/m3 afin de minimiser les risques pour la santé liés à l'exposition au radon à l'intérieur des habitations. Cependant, si ce niveau ne peut pas être atteint dans les conditions spécifiques à chaque pays, le niveau de référence choisi ne devrait pas dépasser 300 Bq/m3.</p>
+                <p>Source : Angell, W. J., Zeeb, H., & Shannon, F. (2009). <em>Handbook on Indoor Radon : A Public Health Perspective</em>. WHO Library Cataloguing-in-Publication Data. <a href="https://iris.who.int/bitstream/handle/10665/44149/9789241547673_eng.pdf;jsessionid=D026AA0F9089BF3A94F8CC90D9B53979?sequence=1">Link to source</a></p>
+            </div>
+        {% endif %}
+        {% if result['type'] == 'floods' %}
+            <div class="floods-legend" style="display: none;">
+                <h5>Risques des inondations:</h5>
+                <p>En plus des éventuels décès, les inondations peuvent entraîner des conséquences telles que des infections gastro-intestinales, cutanées et des infections des voies respiratoires supérieures, provoquées par le développement de moisissures consécutif aux inondations. Elles peuvent également être à l'origine de troubles tels que le stress post-traumatique et de troubles dépressifs majeurs [1]. En Belgique, les Services d'Analyse des Milieux Intérieurs, tels que le SAMI en Wallonie ou la Cellule Régionale d'Intervention en Pollution Intérieure (CRIPI) à Bruxelles, sont disponibles. Les médecins généralistes peuvent faire appel à ces organismes lorsqu'ils soupçonnent que la santé du patient pourrait être liée à des conditions dans son domicile. Des experts se rendent ensuite chez le patient pour effectuer une analyse approfondie de son logement et procéder à des prélèvements.</p>
+                <p>Source: Carias M. E., Johnston D. W., Knott R., and al (2022). <a href="https://doi.org/10.1002/hec.4566">Flood disasters and health among the urban poor. Health Economics, 31(9), 2072-2089.</a></p>
+            </div>
+        {% endif %}
+        {% if result['type'] == 'inorganic_pollutants' %}
+            <div class="inorganic_pollutants-legend" style="display: none;">
+                <h5>Risques des polluants inorganiques:</h5>
+                <ul>
+                    <li>Exposition prolongée au cadmium (Cd): déminéralisation osseuse, affections osseuses et rénales, troubles respiratoires, neurotoxicité, potentiel cancérigène, risque accru de diabète de type 2. Le diagnostic se fait à l'aide d'une prise de sang (tube EDTA).</li>
+                    <li>Exposition prolongée au mercure (Hg): neurotoxicité, tremblements mercuriels (fines fasciculations musculaires ponctuées toutes les quelques minutes par des secousses grossières), gingivite, hypersialorrhée, changements graves de comportement et de personnalité, excitabilité émotionnelle, perte de mémoire, insomnie, dépression, hallucinations, faiblesse, fatigue, anorexie, perte de poids et troubles gastro-intestinaux. [1] Le diagnostic se fait à l'aide d'une prise de sang (tube EDTA). </li>
+                    <li>Exposition prolongée au plomb (Pb): anémie hémolytique, neurotoxicité, infertilité, déficience vitamine D, augmentation du risque cardiovasculaire [1]. Le diagnostic se fait à l'aide d'une prise de sang (tube EDTA). </li>
+                    <li>Exposition prolongée au chrome (Cr): néphrotoxicité, potentiel cancérigène, corrosions gastro-intestinales [3]. Le diagnostic se fait à l'aide d'une prise de sang (tube sérum).</li>
+                    <li>Exposition prolongée au cuivre (Cu): toxicité hépatique [4]. Le diagnostic se fait à l'aide d'une prise de sang (tube sérum). </li>
+                    <li>Exposition prolongée au zinc (Zn): Une exposition à une dose toxique (100-300 mg Zn/j) de zinc (Zn) peut engendrer une carence en cuivre, une anémie, une neutropénie, une altération de la fonction immunitaire et perturbation du profil lipidique [5]. Le diagnostic se fait à l'aide d'une prise de sang (tube oligoéléments).</li>
+                    <li>Exposition prolongée au nickel (Ni): troubles respiratoires et rénaux, neurotoxicité, allergie de contact, potentiel cancérigène, lésions hépatiques [1]. Le diagnostic se fait à l'aide d'une prise de sang (tube sérum).</li>
+                </ul>
+                <p>Sources:</p>
+                <ul>
+                    <li><a href="https://doi.org/10.1002/jcb.26234">[1] Rehman et al. (2017), Journal of Cellular Biochemistry</a></li>
+                    <li><a href="https://doi.org/10.1155/2012/460508">[2] Bernhoft (2012), Journal of Environmental and Public Health</a></li>
+                    <li><a href="https://doi.org/10.1016/0048-9697(89)90201-5">[3] Gad (1989), Science of The Total Environment</a></li>
+                    <li><a href="https://doi.org/10.1007/s00267-019-01234-y">[4] Taylor et al. (2019), Environmental Management</a></li>
+                    <li><a href="https://doi.org/10.1093/ajcn/51.2.225">[5] Fosmire (1990), The American Journal of Clinical Nutrition</a></li>
+                    <li><a href="https://www.alcor-controles.fr/diagnostic-pollution-des-sols-les-principaux-polluants/#les-polluants-composes-inorganique">[6] Alcor Controles</a></li>
+                </ul>
+                <p class="mt-3">Source des données des polluants inorganiques : <a href="https://spaque.be/pollusol-2-des-prelevements-sont-en-cours/">Etude "POLLUSOL 2" menée conjointement par la SPAQuE, l'UCLouvain, l'ULG et l'UMONS. </a></p>
+            </div>
+        {% endif %}
+    </div>
+{% endfor %}
+{{ map_html|safe }}
+
+<!-- Heading before the iframe -->
+<div class="container">
+    <h2 class="my-4">Cartes IRCeline des polluants atmosphériques en temps réels</h2>
+    <p class="mt-3">Source : <a href="https://www.irceline.be/fr">Cellule Interrégionale de l'Environnement (CELINE)</a></p>
+
+    <h4>PM10 - 24h Mean</h4>
+    <iframe height="400" width="100%" src="https://geo.irceline.be/www/pm10_24hmean_FR.html"></iframe>
+
+    <h4>PM2.5 - 24h Mean</h4>
+    <iframe height="400" width="100%" src="https://geo.irceline.be/www/pm25_24hmean_FR.html"></iframe>
+
+    <h4>O3 - Hourly Mean</h4>
+    <iframe height="400" width="100%" src="https://geo.irceline.be/www/o3_hmean_FR.html"></iframe>
+
+    <h4>NO2 - Hourly Mean</h4>
+    <iframe height="400" width="100%" src="https://geo.irceline.be/www/no2_hmean_FR.html"></iframe>
+
+    <h4>Black Carbon (BC) - 24h Mean</h4>
+    <iframe height="400" width="100%" src="https://geo.irceline.be/www/bc_24hmean_FR.html"></iframe>
+</div>
+
+<footer>
+    &copy; 2023 PRISM Analyzer. All rights reserved by ELIE UCLouvain.
+</footer>
+
+    <!-- JavaScript Imports and Functions -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script>
+        // JavaScript for form interaction and toggling details
+        document.getElementById("analysisForm").addEventListener('submit', function() {
+            document.querySelector('.loading-message').style.display = 'block';
+        });
+
+        document.querySelectorAll('[name="location_type"]').forEach(function(el) {
+            el.addEventListener('change', function() {
+                document.getElementById('coordinates_fields').style.display = this.value === 'coordinates' ? 'block' : 'none';
+                document.getElementById('address_field').style.display = this.value === 'address' ? 'block' : 'none';
+            });
+        });
+
+        function toggleDetails(type) {
+            var details = document.querySelector('.' + type + '-details');
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleLegend(type) {
+            var legend = document.querySelector('.' + type + '-legend');
+            legend.style.display = legend.style.display === 'none' ? 'block' : 'none';
+        }
+
+
+</script>
+</body>
+</html>
